@@ -22,3 +22,7 @@ def create_user(data):
         return {
             "errors": e.errors()
         }, 400
+def get_users():
+    return {
+        "data": users
+    }, 200
