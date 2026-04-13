@@ -1,6 +1,5 @@
 from flask import Blueprint, request
-from services.user_services import create_user
-from services.user_services import create_user, get_users
+from services.user_services import create_user, get_users, get_user_by_id
 
 user_bp = Blueprint('user', __name__)
 
@@ -12,3 +11,7 @@ def create_user_route():
 @user_bp.route('/users', methods=['GET'])
 def get_users_route():
     return get_users()
+
+@user_bp.route('/user/<int:user_id>', methods=['GET'])
+def get_user_route(user_id):
+    return get_user_by_id(user_id)

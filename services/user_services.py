@@ -4,13 +4,12 @@ from pydantic import ValidationError
 
 def create_user(data):
     try:
-        # Validate data
         user = UserSchema(**data)
-
-        # Convert to dictionary
         user_dict = user.dict()
 
-        # Store in list (acting as DB)
+        # Add ID
+        user_dict["id"] = len(users) + 1
+
         users.append(user_dict)
 
         return {
@@ -19,10 +18,15 @@ def create_user(data):
         }, 201
 
     except ValidationError as e:
-        return {
-            "errors": e.errors()
-        }, 400
+        return {"errors": e.errors()}, 400
 def get_users():
     return {
         "data": users
     }, 200
+
+def get_user_by_id(user_id):
+    for user in users:
+        if user["id"] == user_id:
+            return {"data": user}, 200
+
+    return {"message": "User not found"}, 404
