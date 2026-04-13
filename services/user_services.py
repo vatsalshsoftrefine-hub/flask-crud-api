@@ -30,3 +30,27 @@ def get_user_by_id(user_id):
             return {"data": user}, 200
 
     return {"message": "User not found"}, 404
+
+def update_user(user_id, data):
+    try:
+        # Validate new data
+        updated_user = UserSchema(**data)
+        updated_dict = updated_user.dict()
+
+        for user in users:
+            if user["id"] == user_id:
+                # Keep same ID
+                updated_dict["id"] = user_id
+
+                # Update user
+                user.update(updated_dict)
+
+                return {
+                    "message": "User updated successfully",
+                    "data": user
+                }, 200
+
+        return {"message": "User not found"}, 404
+
+    except ValidationError as e:
+        return {"errors": e.errors()}, 400
