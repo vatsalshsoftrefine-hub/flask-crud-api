@@ -1,5 +1,5 @@
-from schemas.user_schemas import UserSchema
-from models.user_models import users
+from .schema import UserSchema
+from .model import users
 from pydantic import ValidationError
 
 def create_user(data):
@@ -54,3 +54,16 @@ def update_user(user_id, data):
 
     except ValidationError as e:
         return {"errors": e.errors()}, 400
+    
+def delete_user(user_id):
+    for user in users:
+        if user["id"] == user_id:
+            users.remove(user)
+
+            return {
+                "message": "User deleted successfully"
+            }, 200
+
+    return {
+        "message": "User not found"
+    }, 404

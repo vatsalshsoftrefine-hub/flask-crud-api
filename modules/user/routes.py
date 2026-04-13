@@ -1,5 +1,6 @@
 from flask import Blueprint, request
-from services.user_services import create_user, get_users, get_user_by_id, update_user
+from .services import create_user, get_users, get_user_by_id, update_user, delete_user
+
 
 user_bp = Blueprint('user', __name__)
 
@@ -20,3 +21,7 @@ def get_user_route(user_id):
 def update_user_route(user_id):
     data = request.json
     return update_user(user_id, data)
+
+@user_bp.route('/user/<int:user_id>', methods=['DELETE'])
+def delete_user_route(user_id):
+    return delete_user(user_id)
