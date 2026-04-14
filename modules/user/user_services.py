@@ -1,25 +1,30 @@
 from .user_schema import UserSchema
 from .user_model import users_db, id_counter
 from pydantic import ValidationError
-from .user_exceptions import UserNotFoundError , BadRequestError
+from .user_exceptions import UserNotFoundError, BadRequestError
 
 
 def create_user(data):
+    """
+    Create a new user after validating input.
+    """
     try:
-        # Validate input
+        # Validate input using Pydantic
         user = UserSchema(**data)
+
+        # Convert to dictionary
         user_dict = user.dict()
 
-        # Get current ID
+        # Generate unique ID
         user_id = id_counter["value"]
 
-        # Assign ID
+        # Assign ID to user
         user_dict["id"] = user_id
 
-        # Store user
+        # Store user in dictionary (in-memory DB)
         users_db[user_id] = user_dict
 
-        # Increment ID
+        # Increment ID counter
         id_counter["value"] += 1
 
         return {
@@ -28,24 +33,26 @@ def create_user(data):
         }, 201
 
     except ValidationError as e:
-        return {"errors": e.errors()}, 400
+        # Extract only error messages (JSON safe)
+        error_messages = [err["msg"] for err in e.errors()]
 
-    except Exception as e:
-        return {"error": str(e)}, 500
+        # Raise custom error (handled in routes)
+        raise BadRequestError(error_messages)
+
 
 def get_users():
     """
-    Returns all users stored in the in-memory database.
+    Return all users.
     """
-    try:
-        return {
-            "data": list(users_db.values())
-        }, 200
+    return {
+        "data": list(users_db.values())
+    }, 200
 
-    except Exception as e:
-        return {"error": str(e)}, 500
 
 def get_user_by_id(user_id):
+    """
+    Fetch user by ID.
+    """
     user = users_db.get(user_id)
 
     if not user:
@@ -53,17 +60,24 @@ def get_user_by_id(user_id):
 
     return {"data": user}, 200
 
+
 def update_user(user_id, data):
+    """
+    Update existing user.
+    """
     user = users_db.get(user_id)
 
     if not user:
         raise UserNotFoundError("User not found")
 
     try:
+        # Validate updated data
         updated_user = UserSchema(**data)
+
         updated_dict = updated_user.dict()
         updated_dict["id"] = user_id
 
+        # Update user in DB
         users_db[user_id] = updated_dict
 
         return {
@@ -72,13 +86,19 @@ def update_user(user_id, data):
         }, 200
 
     except ValidationError as e:
-        raise BadRequestError(e.errors())
+        error_messages = [err["msg"] for err in e.errors()]
+        raise BadRequestError(error_messages)
 
 
 def delete_user(user_id):
+    """
+    Delete user by ID.
+    """
     if user_id not in users_db:
         raise UserNotFoundError("User not found")
 
     del users_db[user_id]
 
-    return {"message": "User deleted successfully"}, 200
+    return {
+        "message": "User deleted successfully"
+    }, 200
