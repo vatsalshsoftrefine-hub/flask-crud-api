@@ -1,2 +1,7 @@
+# In-memory database using dictionary
 users_db = {}
-current_id = 1
+
+# Counter to generate unique user IDs
+id_counter = {
+    "value": 1
+}

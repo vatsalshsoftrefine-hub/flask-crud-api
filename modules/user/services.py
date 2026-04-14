@@ -1,47 +1,37 @@
 from .user_schema import UserSchema
-from .user_model import users_db
+from .user_model import users_db, id_counter
 from pydantic import ValidationError
 from .user_exceptions import UserNotFoundError , BadRequestError
 
-# Temporary counter to assign unique IDs to users
-current_id = 1
-
 
 def create_user(data):
-    """
-    Creates a new user after validating input data.
-    """
-    global current_id
     try:
-        # Step 1: Validate incoming data using Pydantic schema
+        # Validate input
         user = UserSchema(**data)
-
-        # Step 2: Convert validated object into dictionary
         user_dict = user.dict()
 
-        # Step 3: Assign a unique ID to the user
-        user_dict["id"] = current_id
+        # Get current ID
+        user_id = id_counter["value"]
 
-        # Step 4: Store user in dictionary (acting as in-memory database)
-        users_db[current_id] = user_dict
+        # Assign ID
+        user_dict["id"] = user_id
 
-        # Step 5: Increment ID for next user
-        current_id += 1
+        # Store user
+        users_db[user_id] = user_dict
 
-        # Step 6: Return success response
+        # Increment ID
+        id_counter["value"] += 1
+
         return {
             "message": "User created successfully",
             "data": user_dict
         }, 201
 
     except ValidationError as e:
-        # Handles validation errors (invalid input data)
         return {"errors": e.errors()}, 400
 
     except Exception as e:
-        # Handles unexpected errors
         return {"error": str(e)}, 500
-
 
 def get_users():
     """
