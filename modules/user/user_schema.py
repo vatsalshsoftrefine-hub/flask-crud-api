@@ -1,5 +1,14 @@
 from pydantic import BaseModel, EmailStr, field_validator
 
+
+class RegisterSchema(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    phone: str
+    gender: str
+
+
 class UserSchema(BaseModel):
     name: str
     age: int
@@ -18,3 +27,7 @@ class UserSchema(BaseModel):
         if value <= 0:
             raise ValueError("Age must be greater than 0")
         return value
+    
+class LoginSchema(BaseModel):
+    email: EmailStr
+    password: str

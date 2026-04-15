@@ -1,104 +1,149 @@
-from .user_schema import UserSchema
-from .user_model import users_db, id_counter
 from pydantic import ValidationError
 from .user_exceptions import UserNotFoundError, BadRequestError
+from .user_model import User
+from extensions import db
+import bcrypt
+
+from .user_schema import RegisterSchema, LoginSchema
+from .jwt_utils import generate_token
 
 
-def create_user(data):
-    """
-    Create a new user after validating input.
-    """
+# REGISTER USER
+
+def register_user(data):
     try:
-        # Validate input using Pydantic
-        user = UserSchema(**data)
+        user = RegisterSchema(**data)
 
-        # Convert to dictionary
-        user_dict = user.dict()
+        existing_user = User.query.filter_by(email=user.email).first()
+        if existing_user:
+            raise BadRequestError("User already exists")
 
-        # Generate unique ID
-        user_id = id_counter["value"]
+        hashed_password = bcrypt.hashpw(
+            user.password.encode('utf-8'),
+            bcrypt.gensalt(rounds=4)
+        ).decode('utf-8')
 
-        # Assign ID to user
-        user_dict["id"] = user_id
+        new_user = User(
+            name=user.name,
+            email=user.email,
+            password=hashed_password,
+            phone=user.phone,
+            gender=user.gender,
+            role="user"
+        )
 
-        # Store user in dictionary (in-memory DB)
-        users_db[user_id] = user_dict
+        db.session.add(new_user)
+        db.session.commit()
 
-        # Increment ID counter
-        id_counter["value"] += 1
-
-        return {
-            "message": "User created successfully",
-            "data": user_dict
-        }, 201
+        return {"message": "User registered successfully"}, 201
 
     except ValidationError as e:
-        # Extract only error messages (JSON safe)
-        error_messages = [err["msg"] for err in e.errors()]
+        raise BadRequestError([err["msg"] for err in e.errors()])
 
-        # Raise custom error (handled in routes)
-        raise BadRequestError(error_messages)
+# LOGIN USER
 
-
-def get_users():
-    """
-    Return all users.
-    """
-    return {
-        "data": list(users_db.values())
-    }, 200
-
-
-def get_user_by_id(user_id):
-    """
-    Fetch user by ID.
-    """
-    user = users_db.get(user_id)
-
-    if not user:
-        raise UserNotFoundError("User not found")
-
-    return {"data": user}, 200
-
-
-def update_user(user_id, data):
-    """
-    Update existing user.
-    """
-    user = users_db.get(user_id)
-
-    if not user:
-        raise UserNotFoundError("User not found")
-
+def login_user(data):
     try:
-        # Validate updated data
-        updated_user = UserSchema(**data)
+        user_data = LoginSchema(**data)
 
-        updated_dict = updated_user.dict()
-        updated_dict["id"] = user_id
+        user = User.query.filter_by(email=user_data.email).first()
 
-        # Update user in DB
-        users_db[user_id] = updated_dict
+        if not user:
+            raise BadRequestError("Invalid credentials")
+
+        if not bcrypt.checkpw(
+            user_data.password.encode('utf-8'),
+            user.password.encode('utf-8')
+        ):
+            raise BadRequestError("Invalid credentials")
+
+        token = generate_token(user)
 
         return {
-            "message": "User updated successfully",
-            "data": updated_dict
+            "message": "Login successful",
+            "token": token
         }, 200
 
     except ValidationError as e:
-        error_messages = [err["msg"] for err in e.errors()]
-        raise BadRequestError(error_messages)
+        raise BadRequestError([err["msg"] for err in e.errors()])
 
 
-def delete_user(user_id):
-    """
-    Delete user by ID.
-    """
-    if user_id not in users_db:
-        raise UserNotFoundError("User not found")
 
-    del users_db[user_id]
+# GET ALL USERS (ADMIN)
+
+def get_users():
+    users = User.query.all()
 
     return {
-        "message": "User deleted successfully"
+        "data": [
+            {
+                "id": u.id,
+                "name": u.name,
+                "email": u.email,
+                "phone": u.phone,
+                "gender": u.gender,
+                "role": u.role
+            } for u in users
+        ]
     }, 200
+
+
+# GET USER BY ID
+
+def get_user_by_id(user_id):
+    user = User.query.get(user_id)
+
+    if not user:
+        raise UserNotFoundError("User not found")
+
+    return {
+        "data": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone,
+            "gender": user.gender,
+            "role": user.role
+        }
+    }, 200
+
+
+
+# UPDATE USER
+
+def update_user(user_id, data, current_user):
+    user = User.query.get(user_id)
+
+    if not user:
+        raise UserNotFoundError("User not found")
+
+
+    if current_user["role"] != "admin" and current_user["user_id"] != user_id:
+        raise BadRequestError("You can only update your own profile")
+
+    user.name = data.get("name", user.name)
+    user.email = data.get("email", user.email)
+    user.phone = data.get("phone", user.phone)
+    user.gender = data.get("gender", user.gender)
+
+    db.session.commit()
+
+    return {"message": "User updated successfully"}, 200
+
+
+# DELETE USER
+
+def delete_user(user_id, current_user):
+    user = User.query.get(user_id)
+
+    if not user:
+        raise UserNotFoundError("User not found")
+
+
+    if current_user["role"] != "admin" and current_user["user_id"] != user_id:
+        raise BadRequestError("You can only delete your own profile")
+
+    db.session.delete(user)
+    db.session.commit()
+
+    return {"message": "User deleted successfully"}, 200
